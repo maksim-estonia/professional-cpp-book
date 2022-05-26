@@ -440,8 +440,400 @@ int& xReference = x;
 
 Attaching `&` to a type indicates that the variable is a reference. It is still used as though it was a normal variable, behind the scenes, it is really a pointer to the original variable. Both the variable `x` and the reference variable `xReference` points to exactly the same value. If you change the value through either one of them, the change is visible through the other as well. 
 
-pass by reference p81
+If a function takes an integer parameter, it is really a copy of the integer that you pass in, so you cannot modify the value of the original variable. Pointers to stack variables are often used in C to allow function to modify variables in other stack frames. By dereferencing the pointer, the function can change the memory that represents the variable even though that variable isn't in the current stack frame. 
 
-### Working with Strings and String Views
+Instead of passing pointers to functions, C++ offers a better mechanism, called _pass by reference_, where parameters are references instead of pointers. Following are two implementations of an `addOne()` function. The first one has no effect on the variable that is passed in because it is passed by value and thus the function receives a copy of the value passed to it. The second one uses a reference and thus changes the original variable. 
 
-### Coding with Style
+```cpp
+void addOne(int i)
+{
+    i++; // Has no real effect because this is a copy of the original
+}
+```
+
+```cpp
+void addOne(int& i)
+{
+    i++; // Actually changes the original variable
+}
+```
+
+The syntax for the call to the `addOne()` function with an integer interference is no different than if the function just took an integer:
+
+```cpp
+int myInt = 7;
+addOne(myInt);
+```
+
+If you have a function that needs to return a big structure or class that is expensive to copy, you'll often see the function taking a non-`const` reference to such a structure or class which the function then modifies, instead of directly returning it. Since C++11, this is not necessary anymore. Thanks to move semantics, directly returning structures or classes from functions is efficient without any copying. Move semantics is discussed in detail in Chapter 9.
+
+You will often find code that uses `const` reference parameters for functions. At first, that seems like a contradiction. Reference parameters allow you to change the value of a variable from within another context. `const` seems to prevent such changes. 
+
+**The main value in `const` reference parameters is effciency. When you pass a value into a function, an entire copy is made. When you pass a reference, you are really just passing a pointer to the original so the computer doesn't need to make a copy. By passing a `const` reference, you get the best of both worlds: no copy is made but the original variable cannot be changed.** 
+
+`const` references become more important when you are dealing with objects because they can be large and making copies of them can have unwanted side effects. Subtle issues like this are covered in Chapter 11. 
+
+**If you need to pass an object to a function, prefer to pass it by `const` reference instead of by value. This prevents unnecessary copying. Pass it by non-`const` reference if the function needs to modify the object.** 
+
+Exceptions provide a mechanism for dealing with problems. The following example shows a function, `divideNumbers()`, that throws an exception if the caller passes in a denominator of zero. The use of `std::invalid_argument` requires `<stdexcept>`. 
+
+```cpp
+double divideNumbers(double numerator, double denominator)
+{
+    if (denominator == 0) {
+        throw invalid_argument("Denominator cannot be 0.");
+    }
+    return numerator / denominator;
+}
+```
+
+When the `throw` line is executed, the function immediately ends without returning a value. If the caller surrounds the function call with a `try/catch` block, it is able to handle it. 
+
+```cpp
+try {
+    cout << divideNumbers(2.5, 0.5) << endl;
+    cout << divideNumbers(2.3, 0) << endl;
+    cout << divideNumbers(4.5, 2.5) << endl;
+} catch (const invalid_argument& exception) {
+    cout << "Exception caught: " << exception.what() << endl;
+}
+```
+
+Exceptions can get tricky in C++. To use exceptions properly, you need to understand what happens to the stack variables when an exception is thrown, and you have to be careful to properly catch and handle the necessary exceptions. Also, the preceding example uses the built-in `std::invalid` type, but it is preferable to write your own exception types that are more specific to the error being thrown. Lastly, the C++ compiler doesn't force you to catch every exception that might occur. If your code never catches any exceptions but an exception is thrown, it will be caught by the program itself, which will be terminated. 
+
+_Type inference_ allows the compiler to automatically deduce the type of an expression. There are two keywords for type inference: `auto` and `decltype`.
+
+The `auto` keyword has a number of completely different uses:
+
+- Deducing a function's return type, as explained earlier in this chapter.
+- Structured bindings, as explained earlier in this chapter.
+- Deducing the type of expression, as discussed later in this section.
+- Deducing the type of non-type template parameters, see Chapter 12.
+- `decltype(auto)`, see Chapter 12.
+- Alternative function syntax, see Chapter 12.
+- Generic lambda expressions, see Chapter 18.
+
+However using `auto` to deduce the type of an expression strips away reference and `const` qualifiers. Suppose you have the following function:
+
+```cpp
+#include <string>
+const std::string message = "Test";
+const std::string& foo()
+{
+    return message;
+}
+```
+
+You can call `foo()` and store the result in a variable with the type specified as `auto`, as follows:
+
+```cpp
+auto f1 = foo()
+```
+
+Because `auto` strips away reference and `const` qualifiers, `f1` is of type `string`, and thus a _copy_ is made. If you want a `const` reference, you can explicitly make it a reference and mark it `const`, as follows:
+
+```cpp
+const auto& f2 = foo();
+```
+
+The `decltype` keyword takes an expression as argument, and computes the type of that expression, as shown here:
+
+```cpp
+int x =123;
+decltype(x) y = 456;
+```
+
+The difference between `auto` and `decltype` is that `decltype` does not strip reference and `const` reference to `string`. Defining `f2` using `decltype` as follows results in `f2` being of type `const string&`, and thus no copy is made. 
+
+```cpp
+decltype(foo()) f2 = foo();
+```
+
+On first sight, `decltype` doesn't seem to add much value. However, it is pretty powerful in the context of templates, discussed in Chapter 12 and 22.
+
+A _class_ defines the characteristics of an object. In C++, classes are usually defined in a header file (.h), while their definitions usually are in a corresponding source file (.cpp).
+
+The definition begins by declaring the class name. Inside a set of curly braces, the _data members_ (properties) of the class and its _methods_ (behaviors) are declared. Each data member and method is associated with a particular access level: `public`, `protected`, or `private`. These labels can occur in any order and can be repeated. Members that are `public` can be accessed from outside the class, while members that are `private` cannot be accessed from outside the class. It's recommended to make all your data members `private`, and if needed, to give access to them via `public` getters and setters. This way, you can easily change the representation of your data while keeping the `public` interface the same. 
+
+```cpp
+#include <string>
+
+class AirlineTicket
+{
+private:
+    std::string mPassengerName;
+    int mNumberOfMiles;
+    bool mHasEliteSuperRewardsStatus;
+public:
+    AirlineTicket(/* args */);
+    ~AirlineTicket();
+
+    double calculatePriceInDollars() const;
+
+    const std::string& getPassengerName() const;
+    void setPassengerName(const std::string& name);
+
+    int getNumberOfMiles() const;
+    void setNumberOfMiles(int miles);
+
+    bool hasEliteSuperRewardsStatus() const;
+    void setHasEliteSuperRewardsStatus(bool status);
+};
+
+AirlineTicket::AirlineTicket(/* args */)
+{
+}
+
+AirlineTicket::~AirlineTicket()
+{
+}
+```
+
+This book follows the convention to prefix each data member of a class with a lowercase 'm', such as `mPassengerName`. 
+
+**To follow the `const`-correctness principle, it's always a good idea to declare member functions that do not change any data member of the object as being `cosnt`. These member functions are also called "inspectors", compared to "mutators" for non-`const` member functions.** 
+
+The method that has the same name as the class with no return type is a _constructor_. It is automatically called when an object of the class is created. The method with a tilde (~) character followed by the class name is a _destructor_. It is automatically called when the object is destroyed. 
+
+The are two ways of initializing data members with a constructor. The recommended way is to use a _constructor initializer_, which follows a colon after the constructor name. Here is the `AirlineTicket` constructor with a constructor initializer:
+
+```cpp
+AirlineTicket::AirlineTicket():
+    mPassengerName("Unknown Passenger"),
+    mNumberOfMiles(0),
+    mHasEliteSuperRewardsStatus(false)
+    {}
+```
+
+A second way is to put the initializations in the body of the constructor, as shown here:
+
+```cpp
+AirlineTicket::AirlineTicket()
+{
+    // Initialize data member
+    mPassengerName = "Unknown Passenger";
+    mNumberOfMiles = 0;
+    mHasEliteSuperRewardsStatus = false;
+}
+```
+
+If the constructor is only initializing data members without doing anything else, then there is no real need for a constructor because data members can be initialized directly inside the class definition. 
+
+```cpp
+private:
+    std::string mPassengerName = "Unknown Passenger";
+    int mNumberOfMiles = 0;
+    bool mHasEliteSuperRewardsStatus = false;
+```
+
+If your class additionaly needs to perform some other types of initialization, such as opening a file, allocating memory, and so on, then you still need to write a constructor to handle those. 
+
+```cpp
+AirlineTicket::~AirlineTicket()
+{
+    // Nothing much to do in terms of cleanup
+}
+```
+
+This destructor doesn't need to do anything, and can simply be removed from this class. Destructors are required if you need to perform some cleanup, such as closing files, freeing memory, and so on. 
+
+This example shows the creation of stack-based `AirlineTicket` object as well as a heap-based one:
+
+```cpp
+AirlineTicket myTicket; // Stack-based AirlineTicket
+myTicket.setPassengerName("Sherman");
+myTicket.setNumberOfMiles(700);
+double cost = myTicket.calculatePriceInDollars();
+cout << "This ticket will cost $" << cost << endl;
+
+// Heap-based AirlineTicket with smart pointer
+auto myTicket2 = make_unique<AirlineTicket>();
+myTicket2->setPassengerName("Laudimore");
+myTicket2->setNumberOfMiles(2000);
+myTicket2->setHasEliteSuperRewardsStatus(true);
+double cost2 = myTicket2->calculatePriceInDollars();
+cout << "This other ticket will cost $" << cost2 << endl;
+// no need to delete myTicket2, happens automatically
+
+// Heap-based AirlineTicket without smart pointer (not recommended)
+AirlineTicket* myTicket3 = new AirlineTicket();
+...
+delete myTicket3;   // delete the heap object!
+```
+
+Before C++11, initialization was not always uniform. For example, take the following definition of a circle, once as a structure, and once as a class:
+
+```cpp
+struct CircleStruct
+{
+    int x, y;
+    double radius;
+};
+class CircleClass
+{
+public:
+    CircleClass(int x, int y, double radius)
+        : mX(x), mY(y), mRadius(radius) {}
+    private:
+        int mX, mY;
+        double mRadius;
+};
+```
+
+In pre-C++11, initialization of a variable of type `CircleStruct` and a variable of type `CircleClass` looks different:
+
+```cpp
+CircleStruct myCircle1 = {10, 10, 2.5};
+CircleClass myCircle2{10, 10, 2.5};
+```
+
+For the structure version, you can use the {...} syntax. However, for the class version, you need to call the constructor using function notation (...).
+
+Since C++11, you can more uniformly use the {...} syntax to initialize types, as follows:
+
+```cpp
+CircleStruct myCircle3 = {10, 10, 2.5};
+CircleClass myCircle4 = {10, 10, 2.5};
+```
+
+Uniform initialization is not limited to structures and classes. You can use it to initialize anything in C++. For example, the following code initializes all four variables with the value 3:
+
+```cpp
+int a = 3;
+int b(3);
+int c = {3}; // Uniform initialization
+int d{3}; // Uniform initialization
+```
+
+Uniform initialization can be used to perform zero-initialization of variables; you just specify an empty set of curly braces, as shown here:
+
+```cpp
+int e{};    // Uniform initialization, e will be 0
+```
+
+_Zero-initialization_ constructs objects with the default constructor, and initializes primitive integer types (such as _char_, _int_, and so on), primitive floating-point types to 0.0, and pointer types to `nullptr`.
+
+Using uniform initialization prevents _narrowing_. C++ implicitly performs narrowing, as shown here: 
+
+```cpp
+void func(int i) { /* ... */ }
+int main()
+{
+    int x = 3.14;
+    func(3.14);
+}
+```
+
+In both cases, C++ automatically truncates 3.14 to 3 before assigning it to `x` or calling `func()`. Note that some compilers _might_ issue a warning about this narrowing, while others won't. With uniform initialization, both the assignment to `x` and the call to `func()` _must_ generate a compiler error if your compiler fully conforms to the C++11 standard:
+
+```cpp
+void func(int i) { /* ... */ }
+int main()
+{
+    int x = {3.14}; // Error because narrowing
+    func({3.14}); // Error because narrowing
+}
+```
+
+Uniform initialization can be used to initialize dynamically allocated arrays, as shown here:
+
+```cpp
+int* pArray = new int[4]{0,1,2,3};
+```
+
+It can also be used in the constructor initializer to initialize arrays that are members of a class.
+
+```cpp
+class MyClass
+{
+    public:
+       MyClass() : mArray{0, 1, 2, 3} {}
+    private:
+        int mArray[4];
+};
+```
+
+Uniform initialization can be used with the Standard Library containers as well—such as the `std::vector`, as demonstrated later in this chapter.
+
+There are two types of initialization that use braced initializer list:
+
+- Copy list initialization: `T obj = {arg1, arg2, ...};`
+- Direct list initialization: `T obj {arg1, arg2, ...};`
+
+In combination with auto type deduction, there is an important difference between copy- and direct list initialization introduced with C++17.
+
+Starting with C++17, you have the following results:
+
+```cpp
+// Copy list initialization
+auto a = {11}; // initializer_list<int>
+auto b = {11, 22}; // initializer_list<int>
+
+// Direct list initialization
+auto c {11}; // int
+auto d {11, 22}; // Error, too many elements.
+```
+
+In earlier versions of the standard (C++11/14), both copy- and direct list initialization deduce an `initializer_list<>`:
+
+```cpp
+// Copy list initialization
+auto a = {11}; // initializer_list<int>
+auto b = {11, 22}; // initializer_list<int>
+
+// Direct list initialization
+auto c {11}; // initializer_list<int>
+auto d {11, 22}; // initializer_list<int>
+```
+
+C++ comes with a Standard Library, which contains a lot of useful classes that can easily be used in your code. The benefit of using these classes is that you don't need to reinvent certain classes and you don't need to waste time on implementing things that have already been implemented for you.
+
+You already saw some Standard Library classes earlier in this chapter—for example, `std::string`, `std::array`, `std::vector`, `std::unique_ptr`, and `std::shared_ptr`. 
+
+A program to manage a company's employee records needs to be flexible and have useful features. The feature set for this program includes the following abilities:
+
+- To add an employee
+- To fire an employee
+- To promote an employee
+- To view all employees, past and present
+- To view all current employees
+- To view all former employees
+
+The `Employee` class encapsulates the information describing a single employee. The `Database` class manages all the employees of the company. A seperate `UserInterface` file provides the interactivity of the program. 
+
+The `Employee.h` file defines the `Employee` class. The sections of this file are described individually in the text that follows.
+
+The first line contains a `#pragma once` to prevent the file from being included multiple times.
+
+```cpp
+#pragma once // the header file containing this directive is included only once even if the programmer includes it multiple times during a compilation.
+#include <string>
+namespace Records{
+    const int kDefaultStartingSalary = 30000;
+
+
+}
+
+```
+
+```cpp
+bool getReady() const {
+    return ready;
+}
+```
+
+This is a constant function, meaning a function that will not alter any member variables of the class it belongs to. This is the style recommended to use for getters, since their only purpose is to retrieve data and should not modify anything in the process. [source](https://stackoverflow.com/questions/21478342/c-const-in-getter)
+
+95
+
+```
+g++ -std=c++17 -o Test Employee.cpp Employee.hpp EmployeeTest.cpp
+```
+
+```
+g++ -std=c++17 -o Test ./src/Employee.cpp ./inc/Employee.hpp ./src/EmployeeTest.cpp
+```
+
+The `Database` class uses the `std::vector` class from the Standard Library to store Employee objects. 
+
+
