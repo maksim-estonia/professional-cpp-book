@@ -33,6 +33,8 @@
 
 ### Working with Strings and String Views
 
+[chapter-2](chapter-2.md)
+
 ### Coding with Style
 
 ## Part 2: Professional C++ Software Design
