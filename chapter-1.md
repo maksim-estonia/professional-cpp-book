@@ -831,9 +831,19 @@ g++ -std=c++17 -o Test Employee.cpp Employee.hpp EmployeeTest.cpp
 ```
 
 ```
-g++ -std=c++17 -o Test ./src/Employee.cpp ./inc/Employee.hpp ./src/EmployeeTest.cpp
+g++ -std=c++17 -o Test ./src/Employee.cpp ./src/EmployeeTest.cpp
 ```
 
 The `Database` class uses the `std::vector` class from the Standard Library to store Employee objects. 
 
 
+
+```
+g++ -std=c++17 -o DatabaseTest ./src/Employee.cpp ./src/Database.cpp ./src/DatabaseTest.cpp
+./DatabaseTest
+```
+
+```
+g++ -std=c++17 -o Menu ./src/Employee.cpp ./src/Database.cpp ./src/UserMenu.cpp
+./Menu
+```

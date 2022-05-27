@@ -29,6 +29,8 @@
 
 ### A Crash Course in C++ and the Standard Library
 
+[chapter-1](chapter-1.md)
+
 ### Working with Strings and String Views
 
 ### Coding with Style
