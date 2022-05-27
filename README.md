@@ -37,6 +37,8 @@
 
 ### Coding with Style
 
+[chapter-3](chapter-3.md)
+
 ## Part 2: Professional C++ Software Design
 
 ### Designing Professional C++ Programs
