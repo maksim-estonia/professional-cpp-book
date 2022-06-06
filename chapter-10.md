@@ -269,3 +269,294 @@ class SpreadsheetCell
 };
 ```
 
+### Leveraging Polymorphism
+
+Now that the `SpreadsheetCell` hierarchy is polymorphic, client code can take advantage of the many benefits that polymorphism has to offer. 
+
+### Future Considerations
+
+The new implementation of the `SpreadsheetCell` hierarchy is certainly an improvement from an object-oriented design point of view. Yet, it would probably not suffice as an actual class hierarchy for a real-world spreadsheet program for several reasons. 
+
+First, despite the improved design, one feature is still missing: the ability to convert from one cell type to another. By dividing them into two classes, the cell objects become more loosely integrated. 
+
+To provide the ability to convert from a `DoubleSpreadsheetCell` to a `StringSpreadsheetCell` you could add a _converting constructor_, also known as a _typed constructor_. It has a similar appearance as a copy constructor, but instead of a reference to an object of the same class, it takes a reference to an object of a sibling class. Note also that you now have to declare a default constructor, which can be explicitly defaulted, because the compiler stops generating one as soon as you declare any constructor yourself:
+
+```cpp
+class StringSpreadsheetCell : public SpreadsheetCell
+{
+    public:
+        StringSpreadsheetCell() = default;
+        StringSpreadsheetCell(const DoubleSpreadsheetCell& inDoubleCell);
+    ...
+}
+```
+
+This converting constructor can be implemented as follows:
+
+```cpp
+StringSpreadsheetCell::StringSpreadsheetCell(
+    const DoubleSpreadsheetCell& inDoubleCell)
+{
+    mValue = inDoubleCell.getString();
+}
+```
+
+One approach is to implement a version of each operator for every combination of cells. With only two derived classes, this is manageable. There would be an `operator+` function to add two `double` cells, to add two `string` cells, and to add a `double` cell to a `string` cell. Another approach is to device on a common representation. The preceding implementation already standardizes on a `string` as a common representation of sorts. One possible implementation, which assumes that the result of adding two cells is always a `string` cell, is as follows:
+
+```cpp
+StringSpreadsheetCell operator+(const StringSpreadsheetCell& lhs,
+                                const StringSpreadsheetCell& rhs)
+{
+    StringSpreadsheetCell newCell;
+    newCell.set(lhs.getString() + rhs.getString());
+    return newCell;
+}
+```
+
+### Multiple Inheritance
+
+As you read in Chapter 5, multiple inheritance is often perceived as a complicated and unnecessary part of object-oriented programming. 
+
+**Inheriting from Multiple Classes**
+
+```cpp
+class Baz : public Foo, public Bar
+{
+
+};
+```
+
+By listing multiple parents, the `Baz` object has the following characteristics:
+
+- A `Baz` objects supports the `public` methods, and contains the data members of both `Foo` and `Bar`.
+- The methods of the `Baz` class have access to `protected` data and methods in both `Foo` and `Bar`.
+- A `Baz` object can be upcast to either a `Foo` or a `Bar`.
+- Creating a new `Baz` object automatically calls the `Foo` and `Bar` default constructors, in the order that the classes are listed in the class definition.
+- Deleting a `Baz` object automatically calls the destructors for the `Foo` and `Bar` classes, in the reverse order that the classes are listed in the class definition.
+
+**Naming Collisions and Ambigious Base Classes**
+
+The solution to the ambiguity is to either explicitly upcast the object using a `dynamic_cast()`, essentially hiding the undesired version of the method from the compiler, or to use a _disambiguation syntax_. 
+
+```cpp
+dynamic_cast<Dog&>(myConfusedAnimal).eat();
+myConfusedAnimal.Dog::eat();
+```
+
+**Ambiguous Base Classes**
+
+**Uses for Multiple Inheritance**
+
+At this point, you're probably wondering why programmers would want to tackle multiple inheritance in their code. The most straightforward use case for multiple inheritance is to define a class of objects that is-a something and also is-a something else. 
+
+### Special Cases in Overriding Methods
+
+1. The Base Class Method is Static
+
+In C++, you cannot override a `static` method. there are, however, a few corollaries that you need to understand.
+
+First of all, a method cannot be both `static` and `virtual`. This is the first clue that attempting to override a `static` method will not do what you intend to do. If you have a `static` method in your derived class with the same name as a `static` method in your base class, you actually have two seperate methods. 
+
+In C++, you can call a `static` method using an object, but because the method is `static`, it has no `this` pointer and no access to the object itself, so it is equivalent to calling it by `classname::method()`. Referring to the previous example classes, you can write code as follows, but the results may be surprising:
+
+```cpp
+DerivedStatic myDerivedStatic;
+BaseStatic& ref = myDerivedStatic;
+myDerivedStatic.beStatic();
+ref.beStatic();
+```
+
+2. The Base Class Method is Overloaded
+
+When you override a method by specifying a name and a set of parameters, the compiler implicitly hides all other instances of the name in the base class. The idea is that if you have overridden one method of a given name, you might have intended to override all methods of that name, but simply forgot, and therefore this should be treated as an error. It makes sense if you think about it—why would you want to change some versions of a method and not others?
+
+3. The Base Class Method is privater or protected
+
+There's absolutely nothing wrong with overriding a `private` or `protected` method. Remember that the access specifier for a method determines who is able to _call_ the method. Just because a derived class can't call its parent's `private` methods doesn't mean it can't override them. In fact, overriding a `private` or `protected` method is a common pattern in C++. 
+
+Overriding `private` and `protected` methods is a good way to change certain features of a class without a major overhaul.
+
+4. The Base Class Method has Default Arguments
+
+Derived classes and base classes can each have different default arguments, but the arguments that are used depend on the declared type of the variable, not the underlying object. Following is a simple example of a derived class that provides a different default argument in an overridden method:
+
+```cpp
+class Base
+{
+    public:
+        virtual ~Base() = default;
+        virtual void go(int i = 2) {
+            cout << "Base's go with i=" << i << endl; 
+        }
+};
+
+class Derived : public Base
+{
+    public:
+        virtual void go(int = 7) override {
+            cout << "Derived's go with i=" << i << endl;
+        }
+}
+```
+
+If `go()` is called on a `Derived` object, `Derived`'s version of `go()` is executed with the default argument of 7. If `go()` is called on a `Base` object, `Base`'s version of `go()` is called with the default argument of 2. However (and this is the weird part), if `go()` is called on a `Base` pointer or `Base` reference that really points to a `Derived` object, `Derived`'s version of `go()` is called but with `Base`s default argument of 2. 
+
+```cpp
+Base myBase;
+Derived myDerived;
+Base& myBaseReferenceToDerived = myDerived;
+myBase.go();
+myDerived.go();
+myBaseReferenceToDerived.go();
+```
+
+The output of this code is as follows:
+
+```cpp
+Base's go with i=2
+Derived's go with i=7
+Derived's go with i=2
+```
+
+The reason for this behavior is that C++ uses the compile-time type of the expression to bind default arguments, not the run-time type. Default arguments are not "inherited" in C++. If the `Derived` class in this example failed to provide a default argument as its parents did, it would be overloading the `go()` method with a new non-zero-argument version.
+
+When overriding a method that has a default argument, you should provide a default argument as well, and it should probably be the same value. It is recommended to use a symbolic constant for default values so that the same symbolic constant can be used in derived classes. 
+
+5. The Base Class Method has a Different Access Level
+
+There are two ways you may want to change the access level of a method: you could try to make it more restrictive or less restrictive. Neither case makes much sense in C++, but there are a few legitimate reasons for attempting to do so.
+
+To enforce tighter restrictions on a method (or a data member for that matter), there are two approaches you can take. One way is to change the access specifier for the entire base class. This approach is described later in this chapter. The other approach is simply to redefine the access in the derived class.
+
+```cpp
+class Gregarious
+{
+    public:
+        virtual void talk() {
+            cout << "Gregarious says hi!" << endl;
+        }
+};
+
+class Shy : public Gregarious
+{
+    protected:
+        virtual void talk() {
+            cout << "Shy reluctantly says hi" << endl;
+        }
+};
+```
+
+The `protected` version of `talk()` in the `Shy` class properly overrides the `Gregarious::talk()` method. Any client code that attempts to call `talk()` on a `Shy` object get a compilation error.
+
+The previous example redefined the method in the derived class because it wants to display a different message. If you don't want to change the implementation, but instead only want to change the access level of a method, the preferred way is to simply add a `using` statement in the derived class definition with the desired access level.
+
+It is much easier (and makes more sense) to _lessen_ access restrictions in derived classes. The simplest way is to provide a `public` method that calls a `protected` method from the base class.
+
+### Copy Constructors and Assignment Operators in Derived Classes
+
+Chapter 9 says that providing a copy constructor and assignment operator is considered a good programming practice when you have dynamically allocated memory in a class. When defining a derived class, you need to be careful about copy constructors and `operator=`.
+
+If your derived class does not have any special data (pointers, usually) that require a nondefault copy constructor or `operator=`, you don't need to have one, regardless of whether or not the base class has one. If your derived class omits the copy constructor or `operator=`, a default copy constructor or `operator=` will be provided for the data members specified in the derived class, and the base class copy constructor or `operator=` will be used for the data members specified in the base class. 
+
+On the other hand, if you _do_ specify a copy constructor in the derived class, you need to explicitly chain to the parent copy constructor, as shown in the following code. If you do not do this, the default constructor (not the copy constructor!) will be used for the parent portion of the object.
+
+### Casts
+
+The old C-style casts with `()` still work in C++, and are still used extensively in existing code bases. C-style casts cover all four C++ casts, so they are more error-prone because it's not always obvious what you are trying to achieve, and you might end up with unexpected results. It is strongly recommended to only use the C++ style casts in new code because they are safer and stand out better syntactically in your code.
+
+**const_cast()**
+
+`const_cast()` is the most straightforward of the different casts available. You can use it to add `const`-ness to a variable, or cast away `const`-ness of a variable. It is the only cast of the four that is allowed to cast away `const`-ness. Theoretically, of course, there should be no need for a `const` cast. If a variable is `const`, it should stay `const`. In practice, however, you sometimes find yourself in a situation where a function is specified to take a `const` variable, which it must then pass to a function that takes a non-`const` variable. The "correct" solution would be to make `const` consistent in the program, but that is not always an option, especially if you are using third-party libraries. Thus, you sometimes need to cast away the `const`-ness of a variable, but you should only do this when you are sure the function you are calling will not modify the object; otherwise, there no other option than to restructure your program. 
+
+```cpp
+extern void ThirdPartyLibraryMethod(char * str);
+
+void f(const char* str)
+{
+    ThirdPartyLibraryMethod(const_cast<char*>(str));
+}
+```
+
+Starting with C++17, there is a helper method called `std::as_const()`, defined in `<utility>`, that returns a `const` reference version of its reference parameter. Basicallym `as_const<obj>` is equivalent to `const_cast<const T&>(obj)`, where T is the type of `obj`. As you can see, using `as_const()` is shorter than using `const_cast()`. Here is an example:
+
+```cpp
+std::string str = "C++";
+const std::string& constStr = std::as_const(str);
+```
+
+Watch out when using `as_const()` in combination with `auto`. Remember from Chapter 1 that `auto` strips away reference and `const` qualifiers! So, the following `result` variable has type `std::string`, not `const std::string&`:
+
+```cpp
+auto result = std::as_const(str);
+```
+
+**static_cast()**
+
+You can use `static_cast()` to perform explicit conversions that are supported directly by the language. For example, if you write an arithmetic expression in which you need to convert an `int` to a `double` in order to avoid integer division, use a `static_cast()`. In this example, it's enough to only use `static_cast()` with `i`, because that makes one of the two operands a `double`, making sure C++ performs floating point division.
+
+```cpp
+int i = 3;
+int j = 4;
+double result = static_cast<double>(i)/j;
+```
+
+You can also use `static_cast()` to perform explicit conversions that are allowed because of user-defined constructors or conversion routines. For example, if class `A` has a constructor that takes an object of class `B`, you can convert a `B` object to an `A` object with `static_cast()`. In most situations where you want this behavior, however, the compiler performs the conversion automatically.
+
+Another use of `static_cast()` is to perform downcasts in an inheritance hierarchy, as in this example:
+
+```cpp
+int main()
+{
+    Base* b;
+    Derived* d = new Derived();
+    b = d;  // don't need a cast to go up the inheritance hierarchy
+    d = static_cast<Derived*>(b);   // need a cast to go down the hierarchy
+
+    Base base;
+    Derived derived;
+    Base& br = derived;
+    Derived& dr = static_cast<Derived&>(br);
+    return 0;
+}
+```
+
+These casts work with both pointers and references. They do not work with objects themselves. 
+
+Note that these casts using `static_cast()` do not perform run-time type checking. They allow you to convert any `Base` pointer to a `Derived` pointer, or `Base` reference to a `Derived` reference, even if the `Base` really isn't a `Derived` at run time. For example, the following code compiles and executes, but using the pointer `d` can result in potentially catastrophic failure, including memory overwrites outside the bounds of the object. 
+
+```cpp
+Base* b = new Base();
+Derived* d = static_cast<Derived*>(b);
+```
+
+To perform the cast safely with run-time type checking, use `dynamic_cast()`, which is explained a little later.
+
+**dynamic_cast()**
+
+`dynamic_cast()` provides a run-time check on casts within an inheritance hierarchy. You can use it to cast pointers or references. `dynamic_cast()` checks the run-time type information of the underlying object at run time. If the cast doesn't make sense, `dynamic_cast()` returns a null pointer (for the pointer version), or throws an `std::bad_cast` exception (for the reference version).
+
+The following example shows a correct use of `dynamic_cast()`:
+
+```cpp
+Base* b;
+Derived* d = new Derived();
+b = d;
+d = dynamic_cast<Derived*>(b);
+```
+
+The following `dynamic_cast()` on a reference will cause an exception to be thrown:
+
+```cpp
+Base base;
+Derived derived;
+Base& br = base;
+try {
+    Derived& dr = dynamic_cast<Derived&>(br);
+} catch (const bad_cast&) {
+    cout << "Bad cast!" << endl;
+}
+```
+
+Note that you can perform the same casts down the inheritance hierarchy with a `static_cast()` or `reinterpret_cast()`. The difference with `dynamic_cast()` is that it performs run-time (dynamic) type checking, while `static_cast()` and `reinterpret_cast()` perform the casting even if they are erroneous.
+
+As Chapter 10 discusses, the run-time type information is stored in the vtable of an object. Therefore, in order to use `dynamic_cast()`, your classes must have at least one `virtual` method. If your classes don't have a vtable, trying to use `dynamic_cast()` will result in a compilation error. 
